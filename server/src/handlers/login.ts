@@ -1,22 +1,39 @@
+import { db } from '../db';
+import { usersTable } from '../db/schema';
 import { type LoginInput, type User } from '../schema';
+import { eq } from 'drizzle-orm';
+import { password } from 'bun';
 
-export async function login(input: LoginInput): Promise<User> {
-  // This is a placeholder declaration! Real code should be implemented here.
-  // The goal of this handler is to:
-  // 1. Find user by email in the database
-  // 2. Verify password against stored hash using bcrypt
-  // 3. Return user data if authentication successful
-  // 4. Throw authentication error if credentials invalid
-  
-  return Promise.resolve({
-    id: 1, // Placeholder ID
-    email: input.email,
-    username: 'placeholder_user',
-    password_hash: 'hashed_password',
-    total_xp: 150,
-    current_level: 2,
-    avatar_url: null,
-    created_at: new Date(),
-    updated_at: new Date(),
-  } as User);
-}
+export const login = async (input: LoginInput): Promise<User> => {
+  try {
+    // Find user by email
+    const users = await db.select()
+      .from(usersTable)
+      .where(eq(usersTable.email, input.email))
+      .execute();
+
+    if (users.length === 0) {
+      throw new Error('Invalid email or password');
+    }
+
+    const user = users[0];
+
+    // Verify password against stored hash
+    const isPasswordValid = await password.verify(input.password, user.password_hash);
+    
+    if (!isPasswordValid) {
+      throw new Error('Invalid email or password');
+    }
+
+    // Return user data with proper type conversions
+    return {
+      ...user,
+      // Dates are already Date objects from the database
+      created_at: user.created_at,
+      updated_at: user.updated_at,
+    };
+  } catch (error) {
+    console.error('Login failed:', error);
+    throw error;
+  }
+};

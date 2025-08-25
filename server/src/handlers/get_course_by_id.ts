@@ -1,27 +1,29 @@
+import { db } from '../db';
+import { coursesTable } from '../db/schema';
 import { type Course } from '../schema';
+import { eq, and } from 'drizzle-orm';
 
-export async function getCourseById(courseId: number): Promise<Course | null> {
-  // This is a placeholder declaration! Real code should be implemented here.
-  // The goal of this handler is to:
-  // 1. Fetch a specific course by ID from the database
-  // 2. Include detailed course information
-  // 3. Return null if course not found or not published
-  // 4. Optionally include related lessons data
-  
-  if (courseId === 1) {
-    return Promise.resolve({
-      id: 1,
-      title: 'JavaScript Fundamentals',
-      description: 'Learn the basics of JavaScript programming',
-      difficulty_level: 'beginner' as const,
-      estimated_duration_hours: 8,
-      thumbnail_url: null,
-      is_published: true,
-      order_index: 1,
-      created_at: new Date(),
-      updated_at: new Date(),
-    } as Course);
+export const getCourseById = async (courseId: number): Promise<Course | null> => {
+  try {
+    // Query for the course by ID, only return if published
+    const results = await db.select()
+      .from(coursesTable)
+      .where(and(
+        eq(coursesTable.id, courseId),
+        eq(coursesTable.is_published, true)
+      ))
+      .execute();
+
+    if (results.length === 0) {
+      return null;
+    }
+
+    const course = results[0];
+    
+    // Return the course directly - estimated_duration_hours is already a number from real column
+    return course;
+  } catch (error) {
+    console.error('Failed to get course by ID:', error);
+    throw error;
   }
-  
-  return Promise.resolve(null);
-}
+};

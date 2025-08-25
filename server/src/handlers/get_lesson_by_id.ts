@@ -1,28 +1,31 @@
+import { db } from '../db';
+import { lessonsTable } from '../db/schema';
 import { type Lesson } from '../schema';
+import { eq, and } from 'drizzle-orm';
 
 export async function getLessonById(lessonId: number): Promise<Lesson | null> {
-  // This is a placeholder declaration! Real code should be implemented here.
-  // The goal of this handler is to:
-  // 1. Fetch a specific lesson by ID from the database
-  // 2. Include full lesson content and code template
-  // 3. Return null if lesson not found or not published
-  // 4. Validate user has access to this lesson based on prerequisites
-  
-  if (lessonId === 1) {
-    return Promise.resolve({
-      id: 1,
-      course_id: 1,
-      title: 'Variables and Data Types',
-      content: 'Learn about JavaScript variables and basic data types...',
-      code_template: 'let message = "Hello, World!";\nconsole.log(message);',
-      programming_language: 'javascript',
-      xp_reward: 10,
-      order_index: 1,
-      is_published: true,
-      created_at: new Date(),
-      updated_at: new Date(),
-    } as Lesson);
+  try {
+    // Fetch lesson by ID, ensuring it's published
+    const results = await db.select()
+      .from(lessonsTable)
+      .where(
+        and(
+          eq(lessonsTable.id, lessonId),
+          eq(lessonsTable.is_published, true)
+        )
+      )
+      .execute();
+
+    if (results.length === 0) {
+      return null;
+    }
+
+    const lesson = results[0];
+
+    // Return lesson data - no numeric conversions needed for lessons table
+    return lesson;
+  } catch (error) {
+    console.error('Failed to get lesson by ID:', error);
+    throw error;
   }
-  
-  return Promise.resolve(null);
 }

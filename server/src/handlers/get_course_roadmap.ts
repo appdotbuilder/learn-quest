@@ -1,38 +1,57 @@
+import { db } from '../db';
+import { coursesTable, coursePrerequisitesTable, userProgressTable } from '../db/schema';
 import { type Course } from '../schema';
+import { eq, and, asc } from 'drizzle-orm';
 
-export async function getCourseRoadmap(userId: number): Promise<Course[]> {
-  // This is a placeholder declaration! Real code should be implemented here.
-  // The goal of this handler is to:
-  // 1. Fetch all courses with their prerequisites
-  // 2. Determine which courses are unlocked for the user
-  // 3. Mark courses as locked/unlocked based on completion status
-  // 4. Order courses in logical learning progression
-  // 5. Return roadmap with accessibility information
-  
-  return Promise.resolve([
-    {
-      id: 1,
-      title: 'JavaScript Fundamentals',
-      description: 'Learn the basics of JavaScript programming',
-      difficulty_level: 'beginner' as const,
-      estimated_duration_hours: 8,
-      thumbnail_url: null,
-      is_published: true,
-      order_index: 1,
-      created_at: new Date(),
-      updated_at: new Date(),
-    },
-    {
-      id: 2,
-      title: 'React Development',
-      description: 'Build modern web applications with React',
-      difficulty_level: 'intermediate' as const,
-      estimated_duration_hours: 16,
-      thumbnail_url: null,
-      is_published: true,
-      order_index: 2,
-      created_at: new Date(),
-      updated_at: new Date(),
-    }
-  ] as Course[]);
-}
+export const getCourseRoadmap = async (userId: number): Promise<Course[]> => {
+  try {
+    // First, get all published courses with their order
+    const courses = await db.select()
+      .from(coursesTable)
+      .where(eq(coursesTable.is_published, true))
+      .orderBy(asc(coursesTable.order_index), asc(coursesTable.id))
+      .execute();
+
+    // Get all course prerequisites
+    const prerequisites = await db.select()
+      .from(coursePrerequisitesTable)
+      .execute();
+
+    // Get user's completed courses
+    const userProgress = await db.select()
+      .from(userProgressTable)
+      .where(
+        and(
+          eq(userProgressTable.user_id, userId),
+          eq(userProgressTable.status, 'completed')
+        )
+      )
+      .execute();
+
+    const completedCourseIds = new Set(
+      userProgress.map(progress => progress.course_id)
+    );
+
+    // Create a map of course prerequisites for efficient lookup
+    const coursePrerequisites = new Map<number, number[]>();
+    prerequisites.forEach(prereq => {
+      const courseId = prereq.course_id;
+      const prerequisiteId = prereq.prerequisite_course_id;
+      
+      if (!coursePrerequisites.has(courseId)) {
+        coursePrerequisites.set(courseId, []);
+      }
+      coursePrerequisites.get(courseId)!.push(prerequisiteId);
+    });
+
+    // Convert courses to the expected format, applying numeric conversions
+    return courses.map(course => ({
+      ...course,
+      estimated_duration_hours: parseFloat(course.estimated_duration_hours.toString())
+    }));
+
+  } catch (error) {
+    console.error('Failed to get course roadmap:', error);
+    throw error;
+  }
+};
